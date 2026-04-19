@@ -541,18 +541,24 @@ def usage():
         'model': 'claude-haiku-4-5'
     })
 
-if __name__ == '__main__':
-    init_db()
-
-    # 기존 DB에 news_sources 컬럼이 없으면 추가
+# 모듈 import 시점에 DB 초기화 (gunicorn/로컬 둘 다 대응)
+def _ensure_db_ready():
     try:
-        with get_db() as conn:
-            conn.execute("SELECT news_sources FROM issues LIMIT 1")
-    except Exception:
-        with get_db() as conn:
-            conn.execute("ALTER TABLE issues ADD COLUMN news_sources TEXT DEFAULT '[]'")
+        init_db()
+        # 기존 DB에 news_sources 컬럼이 없으면 추가
+        try:
+            with get_db() as conn:
+                conn.execute("SELECT news_sources FROM issues LIMIT 1")
+        except Exception:
+            with get_db() as conn:
+                conn.execute("ALTER TABLE issues ADD COLUMN news_sources TEXT DEFAULT '[]'")
+    except Exception as e:
+        print(f"[init_db warning] {e}")
 
-    # 스케줄러 시작 (텔레그램 설정 시 자동 발송)
+_ensure_db_ready()
+
+if __name__ == '__main__':
+    # 로컬 전용: 스케줄러 시작 (Render는 외부 cron-job.org 사용)
     try:
         from scheduler import start_scheduler
         start_scheduler("07:00")
