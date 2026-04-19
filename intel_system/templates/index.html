@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>글로벌 인텔리전스 시스템</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0d0e12;--bg2:#13151c;--bg3:#1a1d27;--bg4:#21253a;
+  --border:#2a2e45;--border2:#353a55;
+  --text:#e8eaf0;--text2:#9097b8;--text3:#5a6080;
+  --amber:#c8821a;--amber2:#e8a020;--amber3:#f5b840;
+  --green:#1aad6e;--red:#d44;--blue:#3a8ee8;
+  --high-bg:#2a1515;--high-c:#e05050;
+  --med-bg:#2a2010;--med-c:#d4922a;
+  --low-bg:#102a1a;--low-c:#2aad6e;
+}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+/* ─── HEADER ─── */
+.hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:.875rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.hdr-left{display:flex;align-items:center;gap:12px;}
+.logo{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;}
+.hdr-title{font-size:16px;font-weight:500;}
+.hdr-right{display:flex;align-items:center;gap:12px;}
+.badge{font-family:'Space Mono',monospace;font-size:9px;padding:3px 10px;border-radius:3px;letter-spacing:.1em;font-weight:700;text-transform:uppercase;}
+.badge-free{background:#1a1a0d;color:var(--amber2);border:1px solid #50401a;}
+.badge-local{background:#0d1a2a;color:var(--blue);border:1px solid #1a3050;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite;margin-right:4px;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* ─── LAYOUT ─── */
+.layout{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.sb-section{padding:.75rem 0;}
+.sb-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--text3);padding:0 1rem .5rem;text-transform:uppercase;}
+.cat-btn{width:100%;padding:.6rem 1rem;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:9px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:var(--text2);text-align:left;transition:all .15s;}
+.cat-btn:hover{background:var(--bg3);color:var(--text);}
+.cat-btn.active{background:var(--bg3);color:var(--amber3);border-left:2px solid var(--amber);padding-left:calc(1rem - 2px);}
+.cat-icon{width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.cat-sub{font-size:10px;color:var(--text3);margin-top:1px;}
+.sb-divider{border:none;border-top:1px solid var(--border);margin:.5rem 0;}
+/* ─── MAIN ─── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.tab-bar{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;flex-shrink:0;}
+.tab{padding:.75rem 1.25rem;border:none;background:transparent;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.tab:hover{color:var(--text2);}
+.tab.active{color:var(--amber2);border-bottom-color:var(--amber);}
+.content{flex:1;overflow-y:auto;padding:1.25rem;}
+/* ─── STATS ─── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.875rem;}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:6px;}
+.stat-value{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--text);}
+.stat-sub{font-size:10px;color:var(--text3);margin-top:3px;}
+/* ─── CONTROLS ─── */
+.ctrl-row{display:flex;gap:10px;align-items:center;margin-bottom:1.25rem;}
+.btn{padding:.6rem 1.1rem;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-size:13px;cursor:pointer;transition:all .15s;font-weight:500;}
+.btn-primary{background:var(--amber);color:#0d0e12;border:none;}
+.btn-primary:hover{background:var(--amber2);}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+.btn-sec{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.btn-sec:hover{background:var(--bg3);color:var(--text);}
+.filter-select{padding:.55rem .875rem;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-family:'Noto Sans KR',sans-serif;font-size:12px;}
+/* ─── ISSUE CARDS ─── */
+.issues-grid{display:grid;gap:10px;margin-bottom:1.25rem;}
+.icard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem;cursor:pointer;transition:all .15s;}
+.icard:hover{border-color:var(--border2);background:var(--bg3);}
+.icard.sel{border-color:var(--amber);background:var(--bg3);}
+.icard.starred{border-left:3px solid var(--amber3);}
+.imeta{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.impact{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.08em;padding:2px 8px;border-radius:3px;font-weight:700;text-transform:uppercase;}
+.imp-H{background:var(--high-bg);color:var(--high-c);}
+.imp-M{background:var(--med-bg);color:var(--med-c);}
+.imp-L{background:var(--low-bg);color:var(--low-c);}
+.src-badge{font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:1px 6px;}
+.idate{font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);margin-left:auto;}
+.ititle{font-size:14px;font-weight:500;color:var(--text);margin-bottom:5px;line-height:1.4;}
+.isum{font-size:12px;color:var(--text2);line-height:1.5;}
+.itags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+.tag{font-size:10px;padding:2px 6px;border-radius:3px;background:var(--bg4);color:var(--text3);border:1px solid var(--border);font-family:'Space Mono',monospace;}
+/* ─── ANALYSIS PANEL ─── */
+.apanel{background:var(--bg2);border:1px solid var(--amber);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;}
+.aphdr{padding:.875rem 1.1rem;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.aptitle{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--amber2);text-transform:uppercase;}
+.apbody{padding:1.1rem;}
+.horizon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.1rem;}
+.hzone{padding:.875rem;border-radius:7px;border:1px solid var(--border);}
+.hzone-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;}
+.hz-s .hzone-label{color:var(--green);}
+.hz-m .hzone-label{color:var(--amber2);}
+.hz-l .hzone-label{color:var(--blue);}
+.hzone-text{font-size:12px;color:var(--text2);line-height:1.6;}
+.opp-list{display:flex;flex-direction:column;gap:6px;margin-top:.75rem;}
+.opp-item{display:flex;gap:8px;padding:.6rem .875rem;background:var(--bg3);border-radius:6px;font-size:12px;color:var(--text2);line-height:1.4;}
+.risk-box{padding:.875rem;background:var(--high-bg);border:1px solid #4a2020;border-radius:7px;margin-top:.875rem;}
+.risk-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--high-c);margin-bottom:5px;text-transform:uppercase;}
+.risk-text{font-size:12px;color:#e08080;line-height:1.5;}
+.memo-area{width:100%;margin-top:.875rem;padding:.75rem;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:12px;resize:vertical;min-height:60px;line-height:1.5;}
+.memo-area::placeholder{color:var(--text3);}
+.memo-area:focus{outline:none;border-color:var(--amber);}
+.ap-actions{display:flex;gap:8px;margin-top:.75rem;}
+/* ─── PASTE ─── */
+.paste-area{width:100%;min-height:130px;padding:.875rem;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;resize:vertical;line-height:1.6;}
+.paste-area::placeholder{color:var(--text3);}
+.paste-area:focus{outline:none;border-color:var(--amber);}
+.paste-hint{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5;}
+/* ─── TREND ─── */
+.trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.trend-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem;}
+.trend-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--amber2);text-transform:uppercase;margin-bottom:.875rem;}
+.kw-item{display:flex;align-items:center;gap:10px;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:13px;}
+.kw-item:last-child{border:none;}
+.kw-bar-wrap{flex:1;background:var(--bg3);border-radius:2px;height:4px;overflow:hidden;}
+.kw-bar{height:100%;background:var(--amber);border-radius:2px;transition:width .3s;}
+.kw-count{font-family:'Space Mono',monospace;font-size:11px;color:var(--amber2);min-width:24px;text-align:right;}
+/* ─── HISTORY ─── */
+.history-filters{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.hist-table{width:100%;border-collapse:collapse;font-size:12px;}
+.hist-table th{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);padding:.6rem .875rem;text-align:left;border-bottom:1px solid var(--border);background:var(--bg2);}
+.hist-table td{padding:.7rem .875rem;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle;}
+.hist-table tbody tr{cursor:pointer;transition:background .15s}
+.hist-table tbody tr:hover td{background:var(--bg3);color:var(--text);}
+.hist-table tbody tr:hover td:nth-child(4){color:var(--blue);}
+/* ─── LOADING / EMPTY ─── */
+.loading{padding:3rem;text-align:center;color:var(--text3);}
+.loading-bar{width:140px;height:2px;background:var(--bg3);border-radius:1px;margin:1rem auto 0;overflow:hidden;position:relative;}
+.loading-bar::after{content:'';position:absolute;left:-50%;width:50%;height:100%;background:var(--amber);animation:ld 1.2s infinite;}
+@keyframes ld{0%{left:-50%}100%{left:150%}}
+.ltext{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--text3);}
+.empty{padding:4rem 2rem;text-align:center;color:var(--text3);}
+.empty-t{font-size:14px;color:var(--text2);margin-bottom:8px;font-weight:500;}
+.empty-d{font-size:12px;line-height:1.7;}
+.err-box{padding:.875rem;background:var(--high-bg);border:1px solid #4a2020;border-radius:7px;color:var(--high-c);font-size:13px;margin-bottom:1rem;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div>
+      <div class="logo">■ GLOBAL INTELLIGENCE SYSTEM</div>
+      <div class="hdr-title">글로벌 인텔리전스 시스템 v1.0</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="badge badge-local">LOCAL SERVER</span>
+    <span class="badge badge-free" id="cost-badge"><span class="live-dot"></span>₩0 / CLAUDE HAIKU 4.5</span>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-label">분석 카테고리</div>
+      <button class="cat-btn active" onclick="setCat('economy')" id="cat-economy">
+        <div class="cat-icon" style="background:#2a2010">📊</div>
+        <div><div>글로벌 경제</div><div class="cat-sub">시장·금융·무역</div></div>
+      </button>
+      <button class="cat-btn" onclick="setCat('geo')" id="cat-geo">
+        <div class="cat-icon" style="background:#0d1a2a">🌐</div>
+        <div><div>지정학</div><div class="cat-sub">외교·안보·갈등</div></div>
+      </button>
+      <button class="cat-btn" onclick="setCat('tech')" id="cat-tech">
+        <div class="cat-icon" style="background:#1a102a">🤖</div>
+        <div><div>기술혁신</div><div class="cat-sub">AI·반도체·에너지</div></div>
+      </button>
+      <button class="cat-btn" onclick="setCat('society')" id="cat-society">
+        <div class="cat-icon" style="background:#0d2a1a">👥</div>
+        <div><div>사회변화</div><div class="cat-sub">인구·노동·소비</div></div>
+      </button>
+      <button class="cat-btn" onclick="setCat('invest')" id="cat-invest">
+        <div class="cat-icon" style="background:#102a10">💰</div>
+        <div><div>투자기회</div><div class="cat-sub">자산·섹터·한국주식</div></div>
+      </button>
+    </div>
+    <hr class="sb-divider">
+    <div class="sb-section">
+      <div class="sb-label">DB 현황</div>
+      <div id="sidebar-stats" style="padding:0 1rem;font-size:12px;color:var(--text2)">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="tab-bar">
+      <button class="tab active" onclick="setTab('analyze')" id="tab-analyze">AI 분석</button>
+      <button class="tab" onclick="setTab('paste')" id="tab-paste">뉴스 분석</button>
+      <button class="tab" onclick="setTab('briefing')" id="tab-briefing">모닝 브리핑</button>
+      <button class="tab" onclick="setTab('history')" id="tab-history">히스토리</button>
+      <button class="tab" onclick="setTab('trend')" id="tab-trend">트렌드</button>
+    </div>
+    <div class="content" id="content">
+      <!-- 탭 내용이 여기에 -->
+    </div>
+  </div>
+</div>
+
+<script>
+const CAT_LABELS = {economy:'글로벌 경제',geo:'지정학',tech:'기술혁신',society:'사회변화',invest:'투자기회'};
+let curCat = 'economy', curTab = 'analyze', curIssues = [], selIdx = -1;
+
+// ── 초기화 ──
+window.onload = () => { loadSidebarStats(); setTab('analyze'); };
+
+async function api(path, opts={}) {
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+// ── 사이드바 통계 ──
+async function loadSidebarStats() {
+  try {
+    const s = await api('/api/stats');
+    document.getElementById('sidebar-stats').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:6px;padding:.25rem 0">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">총 이슈</span><span style="font-family:'Space Mono',monospace;color:var(--amber2)">${s.total}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">고위험</span><span style="font-family:'Space Mono',monospace;color:var(--high-c)">${s.high}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">분석세션</span><span style="font-family:'Space Mono',monospace;color:var(--text2)">${s.sessions}</span></div>
+      </div>`;
+  } catch(e) {}
+}
+
+function setCat(c) {
+  curCat = c;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('cat-'+c).classList.add('active');
+}
+
+function setTab(t) {
+  curTab = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='analyze') renderAnalyzeTab();
+  else if(t==='paste') renderPasteTab();
+  else if(t==='briefing') renderBriefingTab();
+  else if(t==='history') renderHistoryTab();
+  else if(t==='trend') renderTrendTab();
+}
+
+// ── AI 분석 탭 ──
+function renderAnalyzeTab() {
+  document.getElementById('content').innerHTML = `
+    <div class="stat-grid" id="stat-grid" style="display:none">
+      <div class="stat-card"><div class="stat-label">수집 이슈</div><div class="stat-value" id="sv-count">0</div><div class="stat-sub">이번 분석</div></div>
+      <div class="stat-card"><div class="stat-label">고위험</div><div class="stat-value" id="sv-high" style="color:var(--high-c)">0</div><div class="stat-sub">즉시 주목</div></div>
+      <div class="stat-card"><div class="stat-label">기회 신호</div><div class="stat-value" id="sv-opp" style="color:var(--green)">0</div><div class="stat-sub">포착 가능</div></div>
+      <div class="stat-card"><div class="stat-label">누적 DB</div><div class="stat-value" id="sv-db">-</div><div class="stat-sub">총 저장 이슈</div></div>
+    </div>
+    <div class="ctrl-row">
+      <button class="btn btn-primary" id="fetch-btn" onclick="doAnalyze()">AI 이슈 분석 시작 ↗</button>
+      <span style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace" id="analyze-status">실제 뉴스 수집 → Claude 분석 · 결과 자동 저장</span>
+    </div>
+    <div id="err-area"></div>
+    <div id="issues-area"><div class="empty"><div class="empty-t">카테고리를 선택하고 분석을 시작하세요</div><div class="empty-d">분석 결과는 자동으로 DB에 저장됩니다<br>히스토리 탭에서 누적 데이터를 확인하세요</div></div></div>
+    <div id="analysis-area" style="display:none"></div>`;
+}
+
+async function doAnalyze() {
+  const btn = document.getElementById('fetch-btn');
+  btn.disabled = true; btn.textContent = '분석 중...';
+  document.getElementById('stat-grid').style.display = 'none';
+  document.getElementById('analysis-area').style.display = 'none';
+  document.getElementById('err-area').innerHTML = '';
+  document.getElementById('issues-area').innerHTML = `<div class="loading"><div class="ltext">실제 뉴스 수집 중 → Claude 분석 대기...</div><div class="loading-bar"></div></div>`;
+  selIdx = -1;
+  try {
+    const res = await api('/api/analyze', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:curCat})});
+    if(res.error) throw new Error(res.error);
+    curIssues = res.issues;
+    if(res.news_count) {
+      document.getElementById('analyze-status').textContent = `뉴스 ${res.news_count}건 수집 → Claude 분석 완료`;
+    }
+    const high = curIssues.filter(i=>i.impact==='HIGH').length;
+    const opp = curIssues.reduce((s,i)=>s+(i.opportunities?.length||0),0);
+    document.getElementById('stat-grid').style.display = 'grid';
+    document.getElementById('sv-count').textContent = curIssues.length;
+    document.getElementById('sv-high').textContent = high;
+    document.getElementById('sv-opp').textContent = opp;
+    const stats = await api('/api/stats');
+    document.getElementById('sv-db').textContent = stats.total;
+    renderIssueCards('issues-area', curIssues);
+    loadSidebarStats();
+    updateCostBadge();
+  } catch(e) {
+    document.getElementById('err-area').innerHTML = `<div class="err-box">오류: ${e.message}</div>`;
+    document.getElementById('issues-area').innerHTML = '';
+  }
+  btn.disabled = false; btn.textContent = 'AI 이슈 분석 시작 ↗';
+}
+
+// ── 뉴스 붙여넣기 탭 ──
+function renderPasteTab() {
+  document.getElementById('content').innerHTML = `
+    <div style="margin-bottom:1rem">
+      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--amber2);text-transform:uppercase;margin-bottom:.75rem">뉴스 붙여넣기 분석</div>
+      <textarea class="paste-area" id="paste-input" placeholder="분석할 뉴스, 기사, 리포트를 붙여넣으세요...&#10;&#10;네이버뉴스, 한국경제, Bloomberg, Reuters 등 어디서든 복사"></textarea>
+      <div class="paste-hint">※ 텍스트 최대 4,000자 · 분석 결과는 자동으로 DB에 저장됩니다</div>
+      <div style="margin-top:.75rem;display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="doPaste()">붙여넣기 분석 ↗</button>
+        <select class="filter-select" id="paste-cat">
+          <option value="economy">글로벌 경제</option>
+          <option value="geo">지정학</option>
+          <option value="tech">기술혁신</option>
+          <option value="society">사회변화</option>
+          <option value="invest">투자기회</option>
+        </select>
+      </div>
+    </div>
+    <div id="paste-err"></div>
+    <div id="paste-issues"></div>
+    <div id="paste-analysis" style="display:none"></div>`;
+}
+
+async function doPaste() {
+  const text = document.getElementById('paste-input').value.trim();
+  const cat = document.getElementById('paste-cat').value;
+  if(!text){alert('뉴스 내용을 붙여넣어주세요.');return;}
+  document.getElementById('paste-issues').innerHTML = `<div class="loading"><div class="ltext">분석 중...</div><div class="loading-bar"></div></div>`;
+  document.getElementById('paste-analysis').style.display = 'none';
+  document.getElementById('paste-err').innerHTML = '';
+  try {
+    const res = await api('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,category:cat})});
+    if(res.error) throw new Error(res.error);
+    curIssues = res.issues;
+    renderIssueCards('paste-issues', curIssues, 'paste-analysis');
+    loadSidebarStats();
+    updateCostBadge();
+  } catch(e) {
+    document.getElementById('paste-err').innerHTML = `<div class="err-box">오류: ${e.message}</div>`;
+    document.getElementById('paste-issues').innerHTML = '';
+  }
+}
+
+// ── 히스토리 탭 ──
+async function renderHistoryTab(cat='', impact='') {
+  document.getElementById('content').innerHTML = `
+    <div class="history-filters">
+      <select class="filter-select" id="hf-cat" onchange="renderHistoryTab(this.value, document.getElementById('hf-impact').value)">
+        <option value="">전체 카테고리</option>
+        <option value="economy">글로벌 경제</option>
+        <option value="geo">지정학</option>
+        <option value="tech">기술혁신</option>
+        <option value="society">사회변화</option>
+        <option value="invest">투자기회</option>
+      </select>
+      <select class="filter-select" id="hf-impact" onchange="renderHistoryTab(document.getElementById('hf-cat').value, this.value)">
+        <option value="">전체 등급</option>
+        <option value="HIGH">고위험</option>
+        <option value="MED">중요</option>
+        <option value="LOW">관찰</option>
+      </select>
+      <span style="font-size:11px;color:var(--text3);margin-left:auto;font-family:'Space Mono',monospace">최근 50건 · 제목 클릭 = 상세보기</span>
+    </div>
+    <div id="hist-body"><div class="loading"><div class="ltext">불러오는 중...</div><div class="loading-bar"></div></div></div>`;
+  if(cat) document.getElementById('hf-cat').value = cat;
+  if(impact) document.getElementById('hf-impact').value = impact;
+  try {
+    const data = await api(`/api/history?cat=${cat}&impact=${impact}&limit=50`);
+    if(!data.length){document.getElementById('hist-body').innerHTML='<div class="empty"><div class="empty-t">저장된 이슈가 없습니다</div><div class="empty-d">AI 분석이나 뉴스 분석을 실행하면<br>자동으로 여기에 저장됩니다</div></div>';return;}
+    let h = `<table class="hist-table"><thead><tr><th>날짜</th><th>카테고리</th><th>등급</th><th>제목</th><th>출처</th><th>키워드</th></tr></thead><tbody>`;
+    data.forEach(r => {
+      const imp = r.impact==='HIGH'?'H':r.impact==='MED'?'M':'L';
+      const tags = r.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('');
+      h += `<tr onclick='showHistDetail(${JSON.stringify(JSON.stringify(r))})' style="cursor:pointer">
+        <td style="font-family:'Space Mono',monospace;font-size:10px;white-space:nowrap">${r.date}</td>
+        <td style="font-size:11px">${CAT_LABELS[r.category]||r.category}</td>
+        <td><span class="impact imp-${imp}">${r.impact}</span></td>
+        <td style="max-width:280px">${r.title}${r.starred?'<span style="color:var(--amber3);margin-left:6px">★</span>':''}</td>
+        <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3)">${r.source}</td>
+        <td>${tags}</td>
+      </tr>`;
+    });
+    h += '</tbody></table>';
+    document.getElementById('hist-body').innerHTML = h;
+  } catch(e) {
+    document.getElementById('hist-body').innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+}
+
+function showHistDetail(jsonStr) {
+  const r = JSON.parse(jsonStr);
+  curIssues = [r]; selIdx = 0;
+  const isBriefing = r.category === 'briefing' || r.source === 'briefing';
+  const opps = (r.opportunities||[]).map(o=>`<div class="opp-item"><span style="font-size:12px;flex-shrink:0;color:var(--amber2)">◆</span>${o}</div>`).join('');
+  const tagsHtml = (r.tags||[]).map(t=>`<span class="tag">${t}</span>`).join(' ');
+  const newsHtml = (r.news_sources||[]).map(s=>`<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg3);border-radius:4px"><a href="${s.link}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:13px">📰 ${s.title}</a><div style="font-size:11px;color:var(--text3);margin-top:2px">— ${s.source||''}</div></div>`).join('');
+
+  const memoHtml = `
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+    <textarea class="memo-area" id="memo-${r.id}" placeholder="메모 입력...">${r.memo||''}</textarea>
+    <div class="ap-actions">
+      <button class="btn btn-sec" onclick="toggleStar(${r.id}, ${r.starred?1:0})">★ ${r.starred?'즐겨찾기 해제':'즐겨찾기'}</button>
+      <button class="btn btn-primary" onclick="saveMemoText(${r.id}, ${r.starred?1:0})">메모 저장</button>
+    </div>`;
+
+  const existing = document.getElementById('hist-detail');
+  if(existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'hist-detail';
+  div.className = 'apanel';
+  div.style.marginTop = '1rem';
+
+  let bodyHtml = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+      <span class="impact imp-${r.impact==='HIGH'?'H':r.impact==='MED'?'M':'L'}">${r.impact}</span>
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--text3)">${r.date} · ${r.source||''}</span>
+    </div>
+    <div style="font-size:17px;font-weight:600;margin-bottom:1rem;line-height:1.4">${r.title}</div>
+    ${r.summary?`<div style="font-size:14px;line-height:1.7;color:var(--text2);margin-bottom:1rem;padding:12px;background:var(--bg3);border-radius:6px">${r.summary}</div>`:''}
+    ${tagsHtml?`<div style="margin-bottom:1rem">${tagsHtml}</div>`:''}`;
+
+  // 기존 일반 분석 (단기/중기/장기 + 기회 + 리스크)
+  if(!isBriefing && (r.short_term || r.mid_term || r.long_term)) {
+    bodyHtml += `
+      <div class="horizon-grid">
+        <div class="hzone hz-s"><div class="hzone-label">단기 (1~3개월)</div><div class="hzone-text">${r.short_term||'-'}</div></div>
+        <div class="hzone hz-m"><div class="hzone-label">중기 (3~12개월)</div><div class="hzone-text">${r.mid_term||'-'}</div></div>
+        <div class="hzone hz-l"><div class="hzone-label">장기 (1~3년)</div><div class="hzone-text">${r.long_term||'-'}</div></div>
+      </div>`;
+    if(r.opportunities?.length) {
+      bodyHtml += `
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--amber2);text-transform:uppercase;margin-bottom:.5rem">포착 가능한 기회</div>
+        <div class="opp-list">${opps}</div>`;
+    }
+    if(r.risk) {
+      bodyHtml += `<div class="risk-box"><div class="risk-label">핵심 리스크</div><div class="risk-text">${r.risk}</div></div>`;
+    }
+  }
+
+  // 근거 뉴스
+  if(newsHtml) {
+    bodyHtml += `
+      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--blue);text-transform:uppercase;margin-bottom:.5rem">근거 뉴스 출처</div>
+      <div>${newsHtml}</div>`;
+  }
+
+  bodyHtml += memoHtml;
+
+  div.innerHTML = `
+    <div class="aphdr"><span class="aptitle">상세 내용</span><button class="btn btn-sec" onclick="document.getElementById('hist-detail').remove()" style="padding:.3rem .6rem;font-size:11px">닫기</button></div>
+    <div class="apbody">${bodyHtml}</div>`;
+  document.getElementById('content').appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── 모닝 브리핑 탭 ──
+async function renderBriefingTab() {
+  document.getElementById('content').innerHTML = `
+    <div class="ctrl-row">
+      <button class="btn btn-primary" id="new-brief-btn" onclick="generateNewBriefing()">📡 새 브리핑 생성</button>
+      <span style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">50건 뉴스 수집 → Claude 심층 분석 (약 20초)</span>
+    </div>
+    <div id="brief-err"></div>
+    <div style="display:grid;grid-template-columns:320px 1fr;gap:1rem;margin-top:1rem">
+      <div id="brief-list" style="min-height:400px"><div class="loading"><div class="ltext">불러오는 중...</div><div class="loading-bar"></div></div></div>
+      <div id="brief-view"><div class="empty"><div class="empty-t">브리핑을 선택하세요</div><div class="empty-d">왼쪽 목록에서 브리핑을 클릭하면<br>전체 내용이 여기에 표시됩니다</div></div></div>
+    </div>`;
+  await loadBriefingList();
+}
+
+async function loadBriefingList() {
+  try {
+    const rows = await api('/api/briefings/list');
+    if(!rows.length) {
+      document.getElementById('brief-list').innerHTML = '<div class="empty"><div class="empty-t">저장된 브리핑이 없습니다</div><div class="empty-d">"새 브리핑 생성" 버튼을<br>클릭하세요</div></div>';
+      return;
+    }
+    let h = '<div style="display:flex;flex-direction:column;gap:6px">';
+    rows.forEach(r => {
+      const grade = r.grade ? `<span style="background:#1a2a3a;color:#90caf9;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700">${r.grade}</span>` : '';
+      const ratingStars = r.rating ? '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) : '';
+      h += `<div onclick="loadBriefingDetail(${r.id})" id="bli-${r.id}" style="padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all .15s">
+        <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-bottom:4px">${r.date || r.created_at.substring(0,10)} ${grade}</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.4;margin-bottom:4px">${r.headline || '제목 없음'}</div>
+        ${ratingStars?`<div style="font-size:11px;color:var(--amber3)">${ratingStars}</div>`:''}
+      </div>`;
+    });
+    h += '</div>';
+    document.getElementById('brief-list').innerHTML = h;
+  } catch(e) {
+    document.getElementById('brief-list').innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+}
+
+async function loadBriefingDetail(id) {
+  document.querySelectorAll('#brief-list > div > div').forEach(el => el.style.borderColor = 'var(--border)');
+  const sel = document.getElementById('bli-'+id);
+  if(sel) sel.style.borderColor = 'var(--blue)';
+
+  document.getElementById('brief-view').innerHTML = '<div class="loading"><div class="ltext">불러오는 중...</div><div class="loading-bar"></div></div>';
+  try {
+    const data = await api('/api/briefings/'+id);
+    if(data.error) throw new Error(data.error);
+    renderBriefingContent(data);
+  } catch(e) {
+    document.getElementById('brief-view').innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+}
+
+function renderBriefingContent(data) {
+  const b = data.briefing || {};
+  const tldr = b.tldr || {};
+  const alertIcon = {'ALERT':'🚨','WATCH':'⚠️','NORMAL':'🔵'}[tldr.alert_level] || '🔵';
+  const moodColor = {'RISK':'#ff4444','OPPORTUNITY':'#00c853','MIXED':'#ffab00'}[b.mood] || '#8b949e';
+
+  // TL;DR 박스
+  let tldrHtml = '';
+  if(tldr && tldr.one_line) {
+    tldrHtml = `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${moodColor};border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">오늘 한 줄</div>
+        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:12px">${alertIcon} ${tldr.one_line}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;font-size:12px">
+          <div><span style="color:var(--text3)">커리어 영향</span><br><span style="color:var(--text);font-weight:600">${tldr.career_impact||'—'}</span></div>
+          <div><span style="color:var(--text3)">자산 영향</span><br><span style="color:var(--text);font-weight:600">${tldr.asset_impact||'—'}</span></div>
+          <div><span style="color:var(--text3)">권장 독서</span><br><span style="color:var(--text);font-weight:600">${tldr.read_time||'—'}</span></div>
+          <div><span style="color:var(--text3)">오늘 상태</span><br><span style="color:${moodColor};font-weight:700">${tldr.alert_level||'—'}</span></div>
+        </div>
+      </div>`;
+  }
+
+  // Headline
+  let headHtml = '';
+  if(b.headline) {
+    headHtml = `
+      <div style="margin-bottom:20px">
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.3">${b.headline}</div>
+        ${b.mood_reason?`<div style="font-size:13px;color:var(--text2)">${b.mood_reason}</div>`:''}
+      </div>`;
+  }
+
+  // Market Snapshot
+  let marketHtml = '';
+  const ms = b.market_snapshot || {};
+  if(ms.kor_summary || ms.us_summary) {
+    marketHtml = `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--green);text-transform:uppercase;margin-bottom:10px;font-weight:700">📊 오늘의 마켓</div>
+        ${ms.kor_summary?`<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">🇰🇷 ${ms.kor_summary}</div>`:''}
+        ${ms.us_summary?`<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">🇺🇸 ${ms.us_summary}</div>`:''}
+        ${ms.fx_oil?`<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">💱 ${ms.fx_oil}</div>`:''}
+        ${ms.key_signal?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--amber2);font-weight:600">🎯 ${ms.key_signal}</div>`:''}
+      </div>`;
+  }
+
+  // TOP 3
+  let top3Html = '';
+  (b.top3||[]).forEach(item => {
+    const impColor = item.impact==='HIGH'?'#ff4444':'#ff9800';
+    const refs = (item.news_refs||[]).map(r=>`<a href="${r.link}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:12px;display:block;padding:4px 0">📰 ${r.title} — <span style="color:var(--text3)">${r.source||''}</span></a>`).join('');
+
+    let actions = '';
+    if(item.action_30s) actions += `<div style="padding:6px 0;font-size:13px;color:var(--text)"><span style="color:var(--green);font-family:'Space Mono',monospace;font-size:10px;margin-right:8px">[30초]</span>${item.action_30s}</div>`;
+    if(item.action_10m) actions += `<div style="padding:6px 0;font-size:13px;color:var(--text)"><span style="color:var(--green);font-family:'Space Mono',monospace;font-size:10px;margin-right:8px">[10분]</span>${item.action_10m}</div>`;
+    if(item.action_1h) actions += `<div style="padding:6px 0;font-size:13px;color:var(--text)"><span style="color:var(--green);font-family:'Space Mono',monospace;font-size:10px;margin-right:8px">[1시간]</span>${item.action_1h}</div>`;
+    if(!actions && item.action) actions = `<div style="padding:6px 0;font-size:13px">${item.action}</div>`;
+
+    // 뉴스/분석/예측/액션 4단 구조 렌더링
+    const analysis = item.analysis || {};
+    const pred = item.prediction || {};
+    const consensus = analysis.consensus || item.consensus || '';
+    const realityCheck = analysis.reality_check || item.reality_check || '';
+
+    const newsBlock = item.news_fact ? `
+      <div style="border-left:3px solid var(--text3);padding:10px 14px;margin-bottom:12px;background:var(--bg3);border-radius:4px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px;font-weight:700">📰 뉴스 (사실)</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">${item.news_fact}</div>
+      </div>` : '';
+
+    const analysisBlock = (consensus || realityCheck) ? `
+      <div style="border-left:3px solid var(--amber2);padding:10px 14px;margin-bottom:12px;background:#2a1a0d;border-radius:4px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--amber2);text-transform:uppercase;margin-bottom:6px;font-weight:700">🔍 분석 (의미)</div>
+        ${consensus?`<div style="font-size:12px;color:#b0b0b0;margin-bottom:6px"><b style="color:#8b949e">시장 해석:</b> ${consensus}</div>`:''}
+        ${realityCheck?`<div style="font-size:13px;color:#ffe0b2;line-height:1.6"><b style="color:var(--amber2)">놓친 부분:</b> ${realityCheck}</div>`:''}
+      </div>` : '';
+
+    const predBlock = (pred.short_term || pred.mid_term || pred.long_term || item.watch_this) ? `
+      <div style="border-left:3px solid #ff4081;padding:10px 14px;margin-bottom:12px;background:#1a0d1a;border-radius:4px">
+        <div style="font-size:10px;letter-spacing:2px;color:#ff4081;text-transform:uppercase;margin-bottom:6px;font-weight:700">🔮 예측 (전망)</div>
+        ${pred.short_term?`<div style="font-size:13px;color:#ffc1e3;margin-bottom:4px;line-height:1.5"><b style="color:#ff4081">1개월:</b> ${pred.short_term}</div>`:''}
+        ${pred.mid_term?`<div style="font-size:13px;color:#ffc1e3;margin-bottom:4px;line-height:1.5"><b style="color:#ff4081">3개월:</b> ${pred.mid_term}</div>`:''}
+        ${pred.long_term?`<div style="font-size:13px;color:#ffc1e3;margin-bottom:4px;line-height:1.5"><b style="color:#ff4081">1년:</b> ${pred.long_term}</div>`:''}
+        ${pred.key_watch?`<div style="font-size:12px;color:var(--blue);margin-top:8px;padding-top:8px;border-top:1px solid #33002233">👁 검증 지표: ${pred.key_watch}</div>`:''}
+        ${(!pred.short_term && !pred.mid_term && !pred.long_term && item.watch_this)?`<div style="font-size:13px;color:#ffc1e3">${item.watch_this}</div>`:''}
+      </div>` : '';
+
+    const whyBlock = item.why_it_matters ? `
+      <div style="padding:10px 14px;background:var(--bg3);border-radius:4px;margin-bottom:12px">
+        <div style="font-size:10px;color:var(--amber3);letter-spacing:1px;margin-bottom:4px;font-weight:700">💡 나한테 왜 중요?</div>
+        <div style="font-size:13px;color:var(--text)">${item.why_it_matters}</div>
+      </div>` : '';
+
+    const actionBlock = actions ? `
+      <div style="background:#0d2818;border:1px solid #1a5030;border-radius:4px;padding:10px 14px;margin-bottom:12px">
+        <div style="font-size:10px;color:var(--green);letter-spacing:2px;margin-bottom:6px;font-weight:700">✅ 실행 (액션)</div>
+        ${actions}
+      </div>` : '';
+
+    top3Html += `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <span style="background:${impColor};color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700">#${item.rank} ${item.impact}</span>
+          <span style="font-size:16px;font-weight:600">${item.title||''}</span>
+        </div>
+        ${newsBlock}
+        ${analysisBlock}
+        ${predBlock}
+        ${whyBlock}
+        ${actionBlock}
+        ${refs?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px"><div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:6px">📎 근거 뉴스</div>${refs}</div>`:''}
+      </div>`;
+  });
+
+  // Cross Insight
+  let crossHtml = '';
+  const ci = b.cross_insight;
+  if(ci) {
+    const chain = typeof ci === 'string' ? ci : (ci.chain || '');
+    const hidden = typeof ci === 'object' && ci.hidden_risk ? ci.hidden_risk : '';
+    crossHtml = `
+      <div style="background:var(--bg2);border:1px solid var(--blue);border-radius:8px;padding:18px;margin-bottom:16px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--blue);text-transform:uppercase;margin-bottom:10px">🔗 숨은 연결고리</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--text2);margin-bottom:${hidden?'12px':'0'}">${chain}</div>
+        ${hidden?`<div style="border-top:1px solid var(--border);padding-top:10px;font-size:12px;color:#ff9800">⚠️ 놓치면: ${hidden}</div>`:''}
+      </div>`;
+  }
+
+  // Contrarian
+  let contrarianHtml = '';
+  if(b.contrarian_take) {
+    contrarianHtml = `
+      <div style="background:#1a0d1a;border:1px solid #ff4081;border-radius:8px;padding:18px;margin-bottom:16px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:#ff4081;text-transform:uppercase;margin-bottom:10px">🔥 다른 각도</div>
+        <div style="font-size:13px;line-height:1.7;color:#ffc1e3">${b.contrarian_take}</div>
+      </div>`;
+  }
+
+  // Quick Picks
+  let qpHtml = '';
+  if(b.quick_picks && b.quick_picks.length) {
+    const items = b.quick_picks.map(qp => {
+      const sw = qp.so_what?`<div style="font-size:12px;color:var(--amber2);margin-top:4px;margin-left:20px">→ ${qp.so_what}</div>`:'';
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;color:var(--text);line-height:1.5">${qp.emoji||''} ${qp.text||''}</div>${sw}</div>`;
+    }).join('');
+    qpHtml = `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:16px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--blue);text-transform:uppercase;margin-bottom:10px">⚡ 짧게 체크</div>
+        ${items}
+      </div>`;
+  }
+
+  // Closing
+  let closingHtml = '';
+  if(b.closing) {
+    closingHtml = `
+      <div style="text-align:center;padding:20px;color:var(--text2);font-style:italic;font-size:13px;line-height:1.7">"${b.closing}"</div>`;
+  }
+
+  // 평가 섹션
+  const rateHtml = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:20px">
+      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:10px">이 브리핑 평가</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        ${[1,2,3,4,5].map(n=>`<button onclick="rateBriefing(${data.id},${n})" class="btn btn-sec" style="padding:.3rem .6rem;font-size:12px">★ ${n}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:6px">
+        ${['S','A','B','C'].map(g=>`<button onclick="gradeBriefing(${data.id},'${g}')" class="btn btn-sec" style="padding:.3rem .8rem;font-size:12px;font-weight:700">${g}</button>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">평가가 높은 브리핑은 다음 생성 시 few-shot 예시로 활용됩니다 (학습)</div>
+    </div>`;
+
+  document.getElementById('brief-view').innerHTML = `
+    <div style="max-width:800px">
+      ${tldrHtml}
+      ${headHtml}
+      ${marketHtml}
+      <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:20px 0 12px">▣ 오늘의 핵심 3가지</div>
+      ${top3Html}
+      ${crossHtml}
+      ${contrarianHtml}
+      ${qpHtml}
+      ${closingHtml}
+      ${rateHtml}
+    </div>`;
+}
+
+async function generateNewBriefing() {
+  const btn = document.getElementById('new-brief-btn');
+  btn.disabled = true; btn.textContent = '생성 중... (약 20초)';
+  document.getElementById('brief-err').innerHTML = '';
+  try {
+    const data = await api('/api/briefing', {method:'POST'});
+    if(data.error) throw new Error(data.error);
+    await loadBriefingList();
+    loadBriefingDetail(data.briefing_id);
+  } catch(e) {
+    document.getElementById('brief-err').innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = '📡 새 브리핑 생성';
+}
+
+async function rateBriefing(id, rating) {
+  await api('/api/briefing/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({briefing_id:id, rating})});
+  alert('평가 저장됨');
+  loadBriefingList();
+}
+async function gradeBriefing(id, grade) {
+  await api('/api/briefing/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({briefing_id:id, grade})});
+  alert('등급 저장됨 (S/A는 few-shot 학습에 활용)');
+  loadBriefingList();
+}
+
+// ── 트렌드 탭 ──
+async function renderTrendTab() {
+  document.getElementById('content').innerHTML = `<div class="loading"><div class="ltext">트렌드 분석 중...</div><div class="loading-bar"></div></div>`;
+  try {
+    const data = await api('/api/trends');
+    const maxCount = data.keywords[0]?.count || 1;
+    const kwHtml = data.keywords.slice(0,15).map((k,i)=>`
+      <div class="kw-item">
+        <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);min-width:18px">${i+1}</span>
+        <span style="font-size:13px;flex:1">${k.keyword}</span>
+        <div class="kw-bar-wrap"><div class="kw-bar" style="width:${Math.round(k.count/maxCount*100)}%"></div></div>
+        <span class="kw-count">${k.count}</span>
+      </div>`).join('');
+
+    // 카테고리별 집계
+    const catCount = {};
+    data.daily.forEach(d => { catCount[d.category] = (catCount[d.category]||0) + d.cnt; });
+    const catHtml = Object.entries(catCount).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`
+      <div class="kw-item">
+        <span style="font-size:13px;flex:1">${CAT_LABELS[c]||c}</span>
+        <div class="kw-bar-wrap"><div class="kw-bar" style="width:${Math.round(n/data.total*100)}%;background:var(--blue)"></div></div>
+        <span class="kw-count" style="color:var(--blue)">${n}</span>
+      </div>`).join('');
+
+    document.getElementById('content').innerHTML = `
+      <div class="stat-grid" style="margin-bottom:1.25rem">
+        <div class="stat-card"><div class="stat-label">총 저장 이슈</div><div class="stat-value">${data.total}</div></div>
+        <div class="stat-card"><div class="stat-label">고위험 이슈</div><div class="stat-value" style="color:var(--high-c)">${data.high_total}</div></div>
+        <div class="stat-card"><div class="stat-label">키워드 종류</div><div class="stat-value">${data.keywords.length}</div></div>
+        <div class="stat-card"><div class="stat-label">고위험 비율</div><div class="stat-value" style="color:var(--med-c)">${data.total?Math.round(data.high_total/data.total*100):0}%</div></div>
+      </div>
+      <div class="trend-grid">
+        <div class="trend-card"><div class="trend-title">반복 키워드 TOP 15</div>${kwHtml||'<div class="empty-d">데이터 없음</div>'}</div>
+        <div class="trend-card"><div class="trend-title">카테고리별 누적</div>${catHtml||'<div class="empty-d">데이터 없음</div>'}</div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+}
+
+// ── 공통: 이슈 카드 렌더 ──
+function renderIssueCards(targetId, issues, analysisId='analysis-area') {
+  selIdx = -1;
+  let h = '<div class="issues-grid">';
+  issues.forEach((is,idx) => {
+    const imp = is.impact==='HIGH'?'H':is.impact==='MED'?'M':'L';
+    const impLabel = is.impact==='HIGH'?'고위험':is.impact==='MED'?'중요':'관찰';
+    const tags = (is.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('');
+    const src = is.source==='paste'?'붙여넣기':is.source==='news'?'뉴스기반':'AI';
+    h += `<div class="icard${is.starred?' starred':''}" onclick="selIssue(${idx},'${targetId}','${analysisId}')" id="ic-${targetId}-${idx}">
+      <div class="imeta">
+        <span class="impact imp-${imp}">${impLabel}</span>
+        <span class="src-badge">${src}</span>
+        <span class="idate">${is.date||''}</span>
+      </div>
+      <div class="ititle">${is.title}${is.starred?'<span style="color:var(--amber3);margin-left:6px">★</span>':''}</div>
+      <div class="isum">${is.summary}</div>
+      <div class="itags">${tags}</div>
+    </div>`;
+  });
+  h += '</div>';
+  document.getElementById(targetId).innerHTML = h;
+}
+
+function selIssue(idx, issuesId, analysisId) {
+  if(selIdx===idx){
+    selIdx=-1;
+    document.querySelectorAll('.icard').forEach(c=>c.classList.remove('sel'));
+    document.getElementById(analysisId).style.display='none';
+    return;
+  }
+  selIdx=idx;
+  document.querySelectorAll('.icard').forEach(c=>c.classList.remove('sel'));
+  const card = document.getElementById(`ic-${issuesId}-${idx}`);
+  if(card) card.classList.add('sel');
+  renderAnalysisPanel(curIssues[idx], analysisId);
+}
+
+function renderAnalysisPanel(is, panelId) {
+  const el = document.getElementById(panelId);
+  el.style.display = 'block';
+  const opps = (is.opportunities||[]).map(o=>`<div class="opp-item"><span style="font-size:12px;flex-shrink:0;color:var(--amber2)">◆</span>${o}</div>`).join('');
+  const memoSection = is.id ? `
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:.5rem">메모 & 즐겨찾기</div>
+    <textarea class="memo-area" id="memo-${is.id}" placeholder="이 이슈에 대한 생각, 액션플랜을 메모하세요...">${is.memo||''}</textarea>
+    <div class="ap-actions">
+      <button class="btn btn-sec" onclick="toggleStar(${is.id},${is.starred?1:0})">★ ${is.starred?'즐겨찾기 해제':'즐겨찾기'}</button>
+      <button class="btn btn-primary" onclick="saveMemoText(${is.id},${is.starred?1:0})">저장</button>
+    </div>` : '';
+  el.innerHTML = `<div class="apanel">
+    <div class="aphdr"><span class="aptitle">심층 분석</span></div>
+    <div class="apbody">
+      <div style="font-size:15px;font-weight:500;margin-bottom:.875rem;color:var(--text)">${is.title}</div>
+      <div class="horizon-grid">
+        <div class="hzone hz-s"><div class="hzone-label">단기 (1~3개월)</div><div class="hzone-text">${is.short_term||'-'}</div></div>
+        <div class="hzone hz-m"><div class="hzone-label">중기 (3~12개월)</div><div class="hzone-text">${is.mid_term||'-'}</div></div>
+        <div class="hzone hz-l"><div class="hzone-label">장기 (1~3년)</div><div class="hzone-text">${is.long_term||'-'}</div></div>
+      </div>
+      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--amber2);text-transform:uppercase;margin-bottom:.5rem">포착 가능한 기회</div>
+      <div class="opp-list">${opps}</div>
+      ${is.risk?`<div class="risk-box"><div class="risk-label">핵심 리스크</div><div class="risk-text">${is.risk}</div></div>`:''}
+      ${(is.news_sources&&is.news_sources.length)?`
+        <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--blue);text-transform:uppercase;margin-bottom:.5rem">근거 뉴스 출처</div>
+        <div class="source-list">${is.news_sources.map(s=>`<div style="margin-bottom:6px;font-size:12px"><a href="${s.link}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">📰 ${s.title}</a> <span style="color:var(--text3);font-size:11px">— ${s.source||''}</span></div>`).join('')}</div>
+      `:''}
+      ${memoSection}
+    </div>
+  </div>`;
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function saveMemoText(id, starred) {
+  const memo = document.getElementById(`memo-${id}`)?.value || '';
+  await api('/api/memo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,memo,starred})});
+  alert('저장됐습니다.');
+}
+
+async function toggleStar(id, currentStarred) {
+  const memo = document.getElementById(`memo-${id}`)?.value || '';
+  const newStarred = currentStarred ? 0 : 1;
+  await api('/api/memo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,memo,starred:newStarred})});
+  setTab(curTab);
+}
+
+// ── 비용 배지 업데이트 ──
+async function updateCostBadge() {
+  try {
+    const u = await api('/api/usage');
+    const badge = document.getElementById('cost-badge');
+    if(badge) {
+      const krw = u.cost_krw < 1 ? '₩' + u.cost_krw.toFixed(1) : '₩' + Math.round(u.cost_krw).toLocaleString();
+      badge.innerHTML = `<span class="live-dot"></span>${krw} ($${u.cost_usd.toFixed(3)}) · ${u.calls}회 · CLAUDE HAIKU 4.5`;
+    }
+  } catch(e) {}
+}
+updateCostBadge();
+setInterval(updateCostBadge, 10000);
+</script>
+</body>
+</html>

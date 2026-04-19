@@ -1,0 +1,32 @@
+# ⚠️ 절대 커밋하면 안 되는 파일 (API 키 포함)
+config.py
+intel_system/config.py
+*.env
+.env
+
+# 데이터베이스
+*.db
+intel_system/intel.db
+
+# 임시 파일
+brief_*.json
+briefing_preview.html
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
