@@ -283,42 +283,79 @@ def cron_health():
     """UptimeRobot / cron-job.org 헬스 체크용 (슬립 방지)"""
     return jsonify({'ok': True, 'time': datetime.now().isoformat()})
 
-@app.route('/api/cron/daily-briefing', methods=['GET', 'POST'])
-def cron_daily_briefing():
-    """매일 오전 7시 외부 크론에서 호출 — 브리핑 생성 + 텔레그램 발송
-    Usage: /api/cron/daily-briefing?token=<CRON_SECRET>"""
-    token = request.args.get('token', '') or request.headers.get('X-Cron-Token', '')
-    if not CRON_SECRET or token != CRON_SECRET:
-        return jsonify({'error': 'unauthorized'}), 401
+def _generate_and_send_briefing_async(reuse_hours=6):
+    """브리핑 생성 + 텔레그램 발송 (백그라운드 실행용).
+    reuse_hours: 최근 N시간 내 브리핑 있으면 재사용 (비용 절감)"""
     try:
         from briefing import generate_briefing, format_telegram
         from telegram_bot import send_to_channel, TELEGRAM_TOKEN
 
-        b = generate_briefing()
+        # 최근 브리핑 재사용 가능 여부
+        b = None
+        reused = False
+        try:
+            from datetime import timedelta
+            cutoff = (datetime.now() - timedelta(hours=reuse_hours)).isoformat()
+            with get_db() as conn:
+                row = conn.execute('''
+                    SELECT payload FROM briefings
+                    WHERE created_at > ? ORDER BY created_at DESC LIMIT 1
+                ''', (cutoff,)).fetchone()
+                if row:
+                    b = json.loads(row['payload'])
+                    reused = True
+                    print(f"[cron] 최근 {reuse_hours}h 내 브리핑 재사용 (비용 절감)")
+        except Exception as e:
+            print(f"[cron] 캐시 확인 실패: {e}")
+
+        # 재사용 못하면 새로 생성
+        if not b:
+            print("[cron] 새 브리핑 생성 중...")
+            b = generate_briefing()
+
         telegram_text = format_telegram(b)
 
-        result = None
         if TELEGRAM_TOKEN:
-            result = send_to_channel(telegram_text)
+            send_to_channel(telegram_text)
+            print(f"[cron] 텔레그램 발송 완료 (reused={reused})")
 
-        # DB에 저장
-        now = datetime.now().isoformat()
-        with get_db() as conn:
-            cur = conn.execute('''
-                INSERT INTO briefings(date, headline, payload, created_at)
-                VALUES(?,?,?,?)
-            ''', (b.get('date',''), b.get('headline',''), json.dumps(b, ensure_ascii=False), now))
-            briefing_id = cur.lastrowid
-
-        return jsonify({
-            'ok': True,
-            'briefing_id': briefing_id,
-            'headline': b.get('headline',''),
-            'telegram_sent': bool(result)
-        })
+        # 새로 생성한 경우만 DB에 저장
+        if not reused:
+            now = datetime.now().isoformat()
+            with get_db() as conn:
+                conn.execute('''
+                    INSERT INTO briefings(date, headline, payload, created_at)
+                    VALUES(?,?,?,?)
+                ''', (b.get('date',''), b.get('headline',''), json.dumps(b, ensure_ascii=False), now))
     except Exception as e:
         import traceback
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        print(f"[cron] 오류: {e}\n{traceback.format_exc()}")
+
+
+@app.route('/api/cron/daily-briefing', methods=['GET', 'POST'])
+def cron_daily_briefing():
+    """매일 오전 7시 외부 크론에서 호출 — 백그라운드에서 브리핑 생성 + 발송.
+    즉시 200 리턴해서 cron-job.org 30초 타임아웃 회피.
+    Usage: /api/cron/daily-briefing?token=<CRON_SECRET>"""
+    token = request.args.get('token', '') or request.headers.get('X-Cron-Token', '')
+    if not CRON_SECRET or token != CRON_SECRET:
+        return jsonify({'error': 'unauthorized'}), 401
+
+    # TEST 모드: 실제 생성/발송 없이 OK만 리턴
+    if request.args.get('test') == '1':
+        return jsonify({'ok': True, 'mode': 'test', 'message': '인증 확인됨 — 실제 브리핑 생성 안 함'})
+
+    # 백그라운드 스레드에서 실행, 즉시 200 리턴
+    import threading
+    reuse_hours = int(request.args.get('reuse_hours', '6'))
+    t = threading.Thread(target=_generate_and_send_briefing_async, args=(reuse_hours,), daemon=True)
+    t.start()
+
+    return jsonify({
+        'ok': True,
+        'mode': 'async',
+        'message': '브리핑 생성 시작됨 (백그라운드) — 약 100초 후 텔레그램 채널에 발송됩니다.'
+    })
 
 @app.route('/api/briefing', methods=['POST'])
 def api_briefing():
