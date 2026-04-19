@@ -108,10 +108,7 @@ footer{padding:40px 20px;text-align:center;color:var(--text3);font-size:12px;bor
   <div class="section-sub">실제 발송된 브리핑 예시입니다. 매일 내용이 달라집니다.</div>
 
   <div class="sample-card" id="sample-card">
-    <div style="padding:40px;text-align:center;color:var(--text3)">
-      <div style="font-size:13px">아래 버튼을 눌러 실시간 샘플을 생성하세요</div>
-      <button onclick="loadSample()" class="btn-cta btn-primary" style="margin-top:16px;cursor:pointer;border:none">실시간 브리핑 생성 →</button>
-    </div>
+    <div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">샘플 불러오는 중...</div>
   </div>
 
   <div class="cross-box" id="cross-box" style="display:none">
@@ -203,39 +200,33 @@ footer{padding:40px 20px;text-align:center;color:var(--text3);font-size:12px;bor
 </footer>
 
 <script>
-async function loadSample() {
-  const card = document.getElementById('sample-card');
-  card.innerHTML = '<div style="padding:40px;text-align:center"><div style="color:var(--text3);font-size:13px">최근 발행된 브리핑 불러오는 중...</div></div>';
+// 서버에서 주입된 샘플 브리핑 (즉시 렌더링)
+const SAMPLE_BRIEFING = {{ sample_briefing_json|safe }};
 
-  try {
-    // 1차: 캐시된 최근 브리핑 (빠름)
-    let res = await fetch('/api/briefing/latest');
-    let data;
-    if(res.ok) {
-      data = await res.json();
-    } else {
-      // 저장된 브리핑이 없으면 새로 생성
-      card.innerHTML = '<div style="padding:40px;text-align:center"><div style="color:var(--text3);font-size:13px">첫 브리핑 생성 중... (약 30초)</div><div style="margin-top:12px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--blue);width:0%;animation:loading 30s linear forwards"></div></div></div>';
-      const style = document.createElement('style');
-      style.textContent = '@keyframes loading{0%{width:0%}100%{width:95%}}';
-      document.head.appendChild(style);
-      res = await fetch('/api/briefing', {method:'POST'});
-      data = await res.json();
-    }
-    if(data.error) throw new Error(data.error);
-    const b = data.briefing;
+function loadSample() {
+  const card = document.getElementById('sample-card');
+  const b = SAMPLE_BRIEFING;
+  if(!b || !b.headline) {
+    card.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">샘플 준비 중입니다. 잠시 후 다시 시도해주세요.</div>';
+    return;
+  }
+  const data = { briefing: b };
+  // 이후 기존 렌더링 로직을 그대로 사용
+  (function render() {
     const moodIcon = {RISK:'🔴',OPPORTUNITY:'🟢',MIXED:'🟡'}[b.mood]||'⚪';
 
     let issuesHtml = '';
     (b.top3||[]).forEach(item => {
       const rankClass = item.impact==='HIGH'?'rank-high':'rank-med';
       const refsHtml = (item.news_refs||[]).map(r => `<a href="${r.link}" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">📰 ${r.title} — ${r.source}</a>`).join('<br>');
+      const newsFact = item.news_fact || item.summary || '';
+      const action = item.action_30s || item.action_10m || item.action || '';
       issuesHtml += `
         <div class="sample-issue">
           <div class="issue-title"><span class="issue-rank ${rankClass}">${item.rank}</span>${item.title}</div>
-          <div class="issue-sum">${item.summary}</div>
-          <div class="issue-why">💡 왜 중요? ${item.why_it_matters}</div>
-          <div class="issue-action">✅ 오늘의 액션: ${item.action}</div>
+          <div class="issue-sum">${newsFact}</div>
+          <div class="issue-why">💡 왜 중요? ${item.why_it_matters||''}</div>
+          <div class="issue-action">✅ 오늘 실행: ${action}</div>
           <div style="margin-top:8px;font-size:12px">${refsHtml}</div>
         </div>`;
     });
@@ -260,12 +251,17 @@ async function loadSample() {
       </div>`;
 
     const crossBox = document.getElementById('cross-box');
-    crossBox.style.display = 'block';
-    document.getElementById('cross-text').textContent = b.cross_insight||'';
+    if(crossBox) {
+      crossBox.style.display = 'block';
+      const chain = (b.cross_insight && typeof b.cross_insight === 'object') ? (b.cross_insight.chain||'') : (b.cross_insight||'');
+      document.getElementById('cross-text').textContent = chain;
+    }
+  })();
+}
 
-  } catch(e) {
-    card.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red)">${e.message}</div>`;
-  }
+// 페이지 로드 시 자동으로 샘플 렌더링 (즉시 표시)
+if (SAMPLE_BRIEFING && SAMPLE_BRIEFING.headline) {
+  document.addEventListener('DOMContentLoaded', loadSample);
 }
 </script>
 </body>

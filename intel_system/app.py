@@ -160,7 +160,18 @@ def index():
 
 @app.route('/landing')
 def landing():
-    return render_template('landing.html')
+    """랜딩 페이지 — 샘플 브리핑을 서버에서 직접 주입"""
+    import os
+    sample_json = '{}'
+    try:
+        sample_path = os.path.join(os.path.dirname(__file__), 'sample_briefing.json')
+        if os.path.exists(sample_path):
+            with open(sample_path, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+                sample_json = d.get('payload', '{}')
+    except Exception:
+        pass
+    return render_template('landing.html', sample_briefing_json=sample_json)
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
