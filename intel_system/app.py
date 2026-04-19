@@ -2,7 +2,7 @@ import sqlite3, json, requests, re, xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 from urllib.parse import quote
-from config import CLAUDE_API_KEY
+from config import CLAUDE_API_KEY, CRON_SECRET
 
 app = Flask(__name__)
 DB = 'intel.db'
@@ -277,6 +277,48 @@ def paste_analyze():
         return jsonify({'issues': issues})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/cron/health')
+def cron_health():
+    """UptimeRobot / cron-job.org 헬스 체크용 (슬립 방지)"""
+    return jsonify({'ok': True, 'time': datetime.now().isoformat()})
+
+@app.route('/api/cron/daily-briefing', methods=['GET', 'POST'])
+def cron_daily_briefing():
+    """매일 오전 7시 외부 크론에서 호출 — 브리핑 생성 + 텔레그램 발송
+    Usage: /api/cron/daily-briefing?token=<CRON_SECRET>"""
+    token = request.args.get('token', '') or request.headers.get('X-Cron-Token', '')
+    if not CRON_SECRET or token != CRON_SECRET:
+        return jsonify({'error': 'unauthorized'}), 401
+    try:
+        from briefing import generate_briefing, format_telegram
+        from telegram_bot import send_to_channel, TELEGRAM_TOKEN
+
+        b = generate_briefing()
+        telegram_text = format_telegram(b)
+
+        result = None
+        if TELEGRAM_TOKEN:
+            result = send_to_channel(telegram_text)
+
+        # DB에 저장
+        now = datetime.now().isoformat()
+        with get_db() as conn:
+            cur = conn.execute('''
+                INSERT INTO briefings(date, headline, payload, created_at)
+                VALUES(?,?,?,?)
+            ''', (b.get('date',''), b.get('headline',''), json.dumps(b, ensure_ascii=False), now))
+            briefing_id = cur.lastrowid
+
+        return jsonify({
+            'ok': True,
+            'briefing_id': briefing_id,
+            'headline': b.get('headline',''),
+            'telegram_sent': bool(result)
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/briefing', methods=['POST'])
 def api_briefing():
