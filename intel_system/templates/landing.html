@@ -205,15 +205,23 @@ footer{padding:40px 20px;text-align:center;color:var(--text3);font-size:12px;bor
 <script>
 async function loadSample() {
   const card = document.getElementById('sample-card');
-  card.innerHTML = '<div style="padding:40px;text-align:center"><div style="color:var(--text3);font-size:13px">뉴스 수집 + AI 분석 중... (약 15초)</div><div style="margin-top:12px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--blue);width:0%;animation:loading 15s linear forwards"></div></div></div>';
-
-  const style = document.createElement('style');
-  style.textContent = '@keyframes loading{0%{width:0%}100%{width:95%}}';
-  document.head.appendChild(style);
+  card.innerHTML = '<div style="padding:40px;text-align:center"><div style="color:var(--text3);font-size:13px">최근 발행된 브리핑 불러오는 중...</div></div>';
 
   try {
-    const res = await fetch('/api/briefing', {method:'POST'});
-    const data = await res.json();
+    // 1차: 캐시된 최근 브리핑 (빠름)
+    let res = await fetch('/api/briefing/latest');
+    let data;
+    if(res.ok) {
+      data = await res.json();
+    } else {
+      // 저장된 브리핑이 없으면 새로 생성
+      card.innerHTML = '<div style="padding:40px;text-align:center"><div style="color:var(--text3);font-size:13px">첫 브리핑 생성 중... (약 30초)</div><div style="margin-top:12px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--blue);width:0%;animation:loading 30s linear forwards"></div></div></div>';
+      const style = document.createElement('style');
+      style.textContent = '@keyframes loading{0%{width:0%}100%{width:95%}}';
+      document.head.appendChild(style);
+      res = await fetch('/api/briefing', {method:'POST'});
+      data = await res.json();
+    }
     if(data.error) throw new Error(data.error);
     const b = data.briefing;
     const moodIcon = {RISK:'🔴',OPPORTUNITY:'🟢',MIXED:'🟡'}[b.mood]||'⚪';

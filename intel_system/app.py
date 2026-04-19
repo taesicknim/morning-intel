@@ -307,6 +307,40 @@ def rate_briefing():
                      (rating, feedback, grade, bid))
     return jsonify({'ok': True})
 
+@app.route('/api/briefing/latest', methods=['GET'])
+def briefing_latest():
+    """가장 최근 저장된 브리핑 반환 (랜딩 페이지 샘플용 — 빠름)
+    DB에 없으면 정적 sample_briefing.json fallback"""
+    try:
+        with get_db() as conn:
+            row = conn.execute('''
+                SELECT id, date, headline, payload, created_at
+                FROM briefings ORDER BY created_at DESC LIMIT 1
+            ''').fetchone()
+        if row:
+            d = dict(row)
+            d['briefing'] = json.loads(d['payload'])
+        else:
+            # 정적 샘플 fallback
+            import os
+            sample_path = os.path.join(os.path.dirname(__file__), 'sample_briefing.json')
+            if os.path.exists(sample_path):
+                with open(sample_path, 'r', encoding='utf-8') as f:
+                    d = json.load(f)
+                d['briefing'] = json.loads(d['payload'])
+            else:
+                return jsonify({'error': 'no_briefing_yet'}), 404
+
+        try:
+            from briefing import format_telegram, format_html_email
+            d['telegram_text'] = format_telegram(d['briefing'])
+            d['html'] = format_html_email(d['briefing'])
+        except Exception:
+            pass
+        return jsonify(d)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/briefings/list', methods=['GET'])
 def briefings_list():
     """저장된 전체 브리핑 목록"""
