@@ -1,6 +1,6 @@
 # ⚠️ 절대 커밋하면 안 되는 파일 (API 키 포함)
-config.py
-intel_system/config.py
+config_local.py
+intel_system/config_local.py
 *.env
 .env
 
