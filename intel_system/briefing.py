@@ -84,13 +84,25 @@ def _call_claude(prompt):
 
     # app의 usage에도 반영
     try:
-        from app import api_usage, PRICE_INPUT as P_I, PRICE_OUTPUT as P_O
+        from app import api_usage
         api_usage['input_tokens'] += inp
         api_usage['output_tokens'] += out
         api_usage['cost_usd'] += cost
         api_usage['calls'] += 1
     except Exception:
         pass
+
+    # DB에 영구 저장
+    try:
+        conn = sqlite3.connect(DB, timeout=10)
+        conn.execute('''
+            INSERT INTO api_calls(model, input_tokens, output_tokens, cost_usd, endpoint, created_at)
+            VALUES(?,?,?,?,?,?)
+        ''', (MODEL, inp, out, cost, 'briefing', datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[api_calls log] {e}")
 
     return data['content'][0]['text']
 

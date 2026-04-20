@@ -63,6 +63,15 @@ def init_db():
                 grade TEXT DEFAULT '',
                 created_at TEXT
             );
+            CREATE TABLE IF NOT EXISTS api_calls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model TEXT,
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                cost_usd REAL DEFAULT 0.0,
+                endpoint TEXT DEFAULT '',
+                created_at TEXT
+            );
         ''')
 
 def call_claude(prompt):
@@ -616,6 +625,89 @@ def usage():
         'calls': api_usage['calls'],
         'model': 'claude-haiku-4-5'
     })
+
+@app.route('/api/costs')
+def costs():
+    """DB 기반 영구 비용 집계 (재시작에도 유지)"""
+    try:
+        with get_db() as conn:
+            # 전체
+            total = conn.execute('''
+                SELECT COUNT(*) as calls,
+                       COALESCE(SUM(input_tokens),0) as input_tokens,
+                       COALESCE(SUM(output_tokens),0) as output_tokens,
+                       COALESCE(SUM(cost_usd),0) as cost_usd
+                FROM api_calls
+            ''').fetchone()
+
+            # 오늘
+            today = datetime.now().strftime('%Y-%m-%d')
+            today_row = conn.execute('''
+                SELECT COUNT(*) as calls,
+                       COALESCE(SUM(cost_usd),0) as cost_usd
+                FROM api_calls WHERE created_at LIKE ?
+            ''', (today + '%',)).fetchone()
+
+            # 이번 달
+            month_prefix = datetime.now().strftime('%Y-%m')
+            month_row = conn.execute('''
+                SELECT COUNT(*) as calls,
+                       COALESCE(SUM(cost_usd),0) as cost_usd
+                FROM api_calls WHERE created_at LIKE ?
+            ''', (month_prefix + '%',)).fetchone()
+
+            # 일별 추이 (최근 30일)
+            daily = conn.execute('''
+                SELECT SUBSTR(created_at, 1, 10) as date,
+                       COUNT(*) as calls,
+                       SUM(cost_usd) as cost_usd
+                FROM api_calls
+                GROUP BY SUBSTR(created_at, 1, 10)
+                ORDER BY date DESC LIMIT 30
+            ''').fetchall()
+
+            # 모델별
+            by_model = conn.execute('''
+                SELECT model, COUNT(*) as calls, SUM(cost_usd) as cost_usd
+                FROM api_calls GROUP BY model ORDER BY cost_usd DESC
+            ''').fetchall()
+
+        def _usd_to_krw(u): return round((u or 0) * 1450, 1)
+
+        return jsonify({
+            'total': {
+                'calls': total['calls'],
+                'input_tokens': total['input_tokens'],
+                'output_tokens': total['output_tokens'],
+                'cost_usd': round(total['cost_usd'] or 0, 4),
+                'cost_krw': _usd_to_krw(total['cost_usd']),
+            },
+            'today': {
+                'calls': today_row['calls'],
+                'cost_usd': round(today_row['cost_usd'] or 0, 4),
+                'cost_krw': _usd_to_krw(today_row['cost_usd']),
+            },
+            'this_month': {
+                'calls': month_row['calls'],
+                'cost_usd': round(month_row['cost_usd'] or 0, 4),
+                'cost_krw': _usd_to_krw(month_row['cost_usd']),
+            },
+            'daily': [
+                {'date': r['date'], 'calls': r['calls'],
+                 'cost_usd': round(r['cost_usd'] or 0, 4),
+                 'cost_krw': _usd_to_krw(r['cost_usd'])}
+                for r in daily
+            ],
+            'by_model': [
+                {'model': r['model'], 'calls': r['calls'],
+                 'cost_usd': round(r['cost_usd'] or 0, 4),
+                 'cost_krw': _usd_to_krw(r['cost_usd'])}
+                for r in by_model
+            ],
+            'anthropic_console': 'https://console.anthropic.com/settings/billing',
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # 모듈 import 시점에 DB 초기화 (gunicorn/로컬 둘 다 대응)
 def _ensure_db_ready():

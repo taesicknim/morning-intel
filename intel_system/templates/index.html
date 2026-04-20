@@ -842,16 +842,76 @@ async function toggleStar(id, currentStarred) {
 // ── 비용 배지 업데이트 ──
 async function updateCostBadge() {
   try {
-    const u = await api('/api/usage');
+    const c = await api('/api/costs');
     const badge = document.getElementById('cost-badge');
     if(badge) {
-      const krw = u.cost_krw < 1 ? '₩' + u.cost_krw.toFixed(1) : '₩' + Math.round(u.cost_krw).toLocaleString();
-      badge.innerHTML = `<span class="live-dot"></span>${krw} ($${u.cost_usd.toFixed(3)}) · ${u.calls}회 · CLAUDE HAIKU 4.5`;
+      const today = c.today || {cost_krw:0, calls:0};
+      const month = c.this_month || {cost_krw:0, calls:0};
+      const fmt = v => v < 1 ? '₩'+v.toFixed(1) : '₩'+Math.round(v).toLocaleString();
+      badge.innerHTML = `<span class="live-dot"></span>오늘 ${fmt(today.cost_krw)} · 이달 ${fmt(month.cost_krw)} (${month.calls}회)`;
+      badge.title = `전체 누적: ${fmt(c.total.cost_krw)} / ${c.total.calls}회\nAnthropic Console: ${c.anthropic_console||''}`;
+      badge.style.cursor = 'pointer';
+      badge.onclick = () => showCostDetail(c);
     }
   } catch(e) {}
 }
+
+function showCostDetail(c) {
+  const fmt = v => v < 1 ? '₩'+v.toFixed(1) : '₩'+Math.round(v).toLocaleString();
+  const byModelRows = (c.by_model||[]).map(m =>
+    `<tr><td>${m.model}</td><td align="right">${m.calls}</td><td align="right">${fmt(m.cost_krw)}</td></tr>`
+  ).join('');
+  const dailyRows = (c.daily||[]).slice(0, 14).map(d =>
+    `<tr><td>${d.date}</td><td align="right">${d.calls}</td><td align="right">${fmt(d.cost_krw)}</td></tr>`
+  ).join('');
+
+  const modalHtml = `
+    <div id="cost-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)document.getElementById('cost-modal').remove()">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:16px;font-weight:700">💰 API 비용 상세</div>
+          <button onclick="document.getElementById('cost-modal').remove()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+          <div style="background:var(--bg3);padding:12px;border-radius:6px">
+            <div style="font-size:10px;color:var(--text3);letter-spacing:1px">오늘</div>
+            <div style="font-size:18px;font-weight:700;color:var(--amber2)">${fmt(c.today.cost_krw)}</div>
+            <div style="font-size:11px;color:var(--text3)">${c.today.calls}회</div>
+          </div>
+          <div style="background:var(--bg3);padding:12px;border-radius:6px">
+            <div style="font-size:10px;color:var(--text3);letter-spacing:1px">이번 달</div>
+            <div style="font-size:18px;font-weight:700;color:var(--blue)">${fmt(c.this_month.cost_krw)}</div>
+            <div style="font-size:11px;color:var(--text3)">${c.this_month.calls}회</div>
+          </div>
+          <div style="background:var(--bg3);padding:12px;border-radius:6px">
+            <div style="font-size:10px;color:var(--text3);letter-spacing:1px">전체 누적</div>
+            <div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(c.total.cost_krw)}</div>
+            <div style="font-size:11px;color:var(--text3)">${c.total.calls}회 · ${(c.total.input_tokens||0).toLocaleString()}→${(c.total.output_tokens||0).toLocaleString()} tokens</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text3);letter-spacing:1px;margin:16px 0 8px">모델별</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)"><th align="left" style="padding:6px 0">모델</th><th align="right">호출수</th><th align="right">비용</th></tr></thead>
+          <tbody>${byModelRows || '<tr><td colspan="3" style="padding:8px;text-align:center;color:var(--text3)">데이터 없음</td></tr>'}</tbody>
+        </table>
+
+        <div style="font-size:11px;color:var(--text3);letter-spacing:1px;margin:20px 0 8px">일별 추이 (최근 14일)</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead><tr style="color:var(--text3);border-bottom:1px solid var(--border)"><th align="left" style="padding:6px 0">날짜</th><th align="right">호출수</th><th align="right">비용</th></tr></thead>
+          <tbody>${dailyRows || '<tr><td colspan="3" style="padding:8px;text-align:center;color:var(--text3)">데이터 없음</td></tr>'}</tbody>
+        </table>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)">
+          ⚠️ 표시 금액은 추정치입니다. 정확한 청구액은 <a href="${c.anthropic_console||'#'}" target="_blank" style="color:var(--blue)">Anthropic Console</a>에서 확인.
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
 updateCostBadge();
-setInterval(updateCostBadge, 10000);
+setInterval(updateCostBadge, 30000);
 </script>
 </body>
 </html>
