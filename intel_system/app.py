@@ -1,6 +1,11 @@
 import sqlite3, json, requests, re, xml.etree.ElementTree as ET
 from flask import Flask, render_template, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# 한국 표준시 (Render 서버가 UTC라 날짜 어긋남 방지)
+KST = timezone(timedelta(hours=9))
+def _now():
+    return datetime.now(KST)
 from urllib.parse import quote
 from config import CLAUDE_API_KEY, CRON_SECRET
 
@@ -149,7 +154,7 @@ def extract_keywords(issues_list):
                     INSERT INTO keywords(keyword, count, last_seen)
                     VALUES(?,1,?) ON CONFLICT(keyword)
                     DO UPDATE SET count=count+1, last_seen=?
-                ''', (tag, datetime.now().isoformat(), datetime.now().isoformat()))
+                ''', (tag, _now().isoformat(), _now().isoformat()))
 
 CATS = {
     'economy': '글로벌 경제, 금융시장, 중앙은행 정책, 무역, 인플레이션, 환율, 원자재',
@@ -186,7 +191,7 @@ def landing():
 def analyze():
     data = request.json
     cat = data.get('category', 'economy')
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = _now().strftime('%Y-%m-%d')
 
     # 1단계: 실제 뉴스 수집 (무료)
     articles = fetch_news(cat)
@@ -218,7 +223,7 @@ def analyze():
         if not m:
             return jsonify({'error': 'JSON 파싱 실패'}), 500
         issues = json.loads(m.group())
-        now = datetime.now().isoformat()
+        now = _now().isoformat()
         saved = []
         with get_db() as conn:
             for iss in issues:
@@ -254,7 +259,7 @@ def paste_analyze():
     data = request.json
     text = data.get('text', '')[:4000]
     cat = data.get('category', 'economy')
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = _now().strftime('%Y-%m-%d')
     prompt = f"""당신은 세계 최고의 경제·지정학 전문가입니다.
 
 다음 뉴스/기사를 분석하여 핵심 이슈와 인사이트를 추출하세요:
@@ -270,7 +275,7 @@ def paste_analyze():
         if not m:
             return jsonify({'error': '파싱 실패'}), 500
         issues = json.loads(m.group())
-        now = datetime.now().isoformat()
+        now = _now().isoformat()
         with get_db() as conn:
             for iss in issues:
                 cur = conn.execute('''
@@ -290,7 +295,7 @@ def paste_analyze():
 @app.route('/api/cron/health')
 def cron_health():
     """UptimeRobot / cron-job.org 헬스 체크용 (슬립 방지)"""
-    return jsonify({'ok': True, 'time': datetime.now().isoformat()})
+    return jsonify({'ok': True, 'time': _now().isoformat()})
 
 def _generate_and_send_briefing_async(reuse_hours=6):
     """브리핑 생성 + 텔레그램 발송 (백그라운드 실행용).
@@ -304,7 +309,7 @@ def _generate_and_send_briefing_async(reuse_hours=6):
         reused = False
         try:
             from datetime import timedelta
-            cutoff = (datetime.now() - timedelta(hours=reuse_hours)).isoformat()
+            cutoff = (_now() - timedelta(hours=reuse_hours)).isoformat()
             with get_db() as conn:
                 row = conn.execute('''
                     SELECT payload FROM briefings
@@ -330,7 +335,7 @@ def _generate_and_send_briefing_async(reuse_hours=6):
 
         # 새로 생성한 경우만 DB에 저장
         if not reused:
-            now = datetime.now().isoformat()
+            now = _now().isoformat()
             with get_db() as conn:
                 conn.execute('''
                     INSERT INTO briefings(date, headline, payload, created_at)
@@ -365,7 +370,7 @@ def cron_daily_briefing():
         reused = False
         try:
             from datetime import timedelta
-            cutoff = (datetime.now() - timedelta(hours=reuse_hours)).isoformat()
+            cutoff = (_now() - timedelta(hours=reuse_hours)).isoformat()
             with get_db() as conn:
                 row = conn.execute('''
                     SELECT payload FROM briefings
@@ -381,7 +386,7 @@ def cron_daily_briefing():
         if not b:
             b = generate_briefing()
             # DB 저장
-            now = datetime.now().isoformat()
+            now = _now().isoformat()
             with get_db() as conn:
                 conn.execute('''
                     INSERT INTO briefings(date, headline, payload, created_at)
@@ -415,7 +420,7 @@ def api_briefing():
         html_text = format_html_email(b)
 
         # 브리핑 DB 저장 (평가용)
-        now = datetime.now().isoformat()
+        now = _now().isoformat()
         with get_db() as conn:
             cur = conn.execute('''
                 INSERT INTO briefings(date, headline, payload, created_at)
@@ -641,7 +646,7 @@ def costs():
             ''').fetchone()
 
             # 오늘
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = _now().strftime('%Y-%m-%d')
             today_row = conn.execute('''
                 SELECT COUNT(*) as calls,
                        COALESCE(SUM(cost_usd),0) as cost_usd
@@ -649,7 +654,7 @@ def costs():
             ''', (today + '%',)).fetchone()
 
             # 이번 달
-            month_prefix = datetime.now().strftime('%Y-%m')
+            month_prefix = _now().strftime('%Y-%m')
             month_row = conn.execute('''
                 SELECT COUNT(*) as calls,
                        COALESCE(SUM(cost_usd),0) as cost_usd

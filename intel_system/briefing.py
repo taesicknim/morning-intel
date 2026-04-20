@@ -3,13 +3,20 @@
 - 5개 카테고리 뉴스 수집 -> 크로스 분석 -> 프리미엄 브리핑 생성
 """
 import json, re, sqlite3, requests, xml.etree.ElementTree as ET, os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
 from config import CLAUDE_API_KEY
 
+# 한국 표준시 (KST, UTC+9) — Render 서버 UTC 시간대 보정
+KST = timezone(timedelta(hours=9))
+
+def _now_kst():
+    """한국 시간 기준 datetime"""
+    return datetime.now(KST)
+
 DB = 'intel.db'
-# 환경변수로 모델 전환 가능 (기본 Haiku 4.5)
-MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-4-5-20251001')
+# 환경변수로 모델 전환 가능 (기본 Sonnet 4.6 — JSON 안정성 우선)
+MODEL = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-6')
 # 가격 (MODEL에 따라 자동 선택)
 if 'sonnet' in MODEL:
     PRICE_INPUT  = 3.00 / 1_000_000
@@ -51,6 +58,24 @@ def _get_db():
     conn = sqlite3.connect(DB, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
+
+def _parse_briefing_json(raw):
+    """Claude 응답에서 JSON 객체를 견고하게 파싱.
+    - 앞뒤 여분 텍스트 제거
+    - 코드블록 마커 (```json ... ```) 제거
+    - raw_decode로 첫 완전한 JSON만 추출
+    """
+    if not raw:
+        raise ValueError("빈 응답")
+    # 코드블록 제거
+    cleaned = re.sub(r'```(?:json)?\s*', '', raw).strip()
+    cleaned = re.sub(r'```\s*$', '', cleaned).strip()
+    # 첫 '{' 위치 찾기
+    start = cleaned.find('{')
+    if start == -1:
+        raise ValueError("JSON 중괄호 없음")
+    decoder = json.JSONDecoder()
+    return decoder.raw_decode(cleaned[start:])[0]
 
 def _call_claude(prompt):
     url = 'https://api.anthropic.com/v1/messages'
@@ -98,7 +123,7 @@ def _call_claude(prompt):
         conn.execute('''
             INSERT INTO api_calls(model, input_tokens, output_tokens, cost_usd, endpoint, created_at)
             VALUES(?,?,?,?,?,?)
-        ''', (MODEL, inp, out, cost, 'briefing', datetime.now().isoformat()))
+        ''', (MODEL, inp, out, cost, 'briefing', _now_kst().isoformat()))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -254,7 +279,7 @@ def _load_best_examples(limit=2):
 
 def generate_briefing():
     """프리미엄 모닝 브리핑 생성 (실시간 뉴스 + 마켓 데이터)"""
-    today = datetime.now()
+    today = _now_kst()  # 한국 시간 기준
     date_str = today.strftime('%Y-%m-%d')
     weekday = WEEKDAY_KR[today.weekday()]
     is_weekend = today.weekday() >= 5  # 5=토, 6=일
@@ -534,7 +559,7 @@ TOP 3 합쳐 800자, cross_insight 150자, contrarian 100자, quick_picks 150자
         "short_term": "1개월 내 예상. 확률 높은 것 (70%+). 구체 수치/지표/날짜.",
         "mid_term": "3개월 내 예상. 가능성 있는 것 (40-60%). 조건부 표현.",
         "long_term": "1년 내 장기 시나리오. 조건부 ('~가 지속되면 ~').",
-        "key_watch": "예측 검증할 1개 지표 (지표명/발표일/임계값)"
+        "key_watch": "예측 검증할 1개 지표 — 반드시 뉴스에 명시된 정확한 발표일 포함 (예: 'SK하이닉스 1Q 실적발표 4/23'). '보통 4월 말' 같은 모호한 표현 금지. 뉴스에 날짜가 없으면 지표만 쓰고 날짜는 생략."
       }},
       "impact": "HIGH / MED",
       "sources": [뉴스번호],
@@ -577,18 +602,20 @@ TOP 3 합쳐 800자, cross_insight 150자, contrarian 100자, quick_picks 150자
 
 한 개라도 NO면 다시 써라. 순수 JSON만 출력."""
 
-    raw = _call_claude(prompt)
-    # 첫 '{'부터 raw_decode로 첫 완전한 JSON 객체만 파싱 (뒤에 여분 텍스트 있어도 OK)
-    start = raw.find('{')
-    if start == -1:
-        raise ValueError("브리핑 JSON 파싱 실패 — 중괄호 없음")
-    decoder = json.JSONDecoder()
-    try:
-        briefing, _ = decoder.raw_decode(raw[start:])
-    except json.JSONDecodeError as e:
-        # 코드블록이면 벗겨내고 재시도
-        cleaned = re.sub(r'```(?:json)?\s*', '', raw[start:]).strip().rstrip('`')
-        briefing, _ = decoder.raw_decode(cleaned)
+    # 최대 2회 시도 (JSON 파싱 실패 시 재생성)
+    briefing = None
+    last_err = None
+    for attempt in range(2):
+        try:
+            raw = _call_claude(prompt)
+            briefing = _parse_briefing_json(raw)
+            break
+        except (json.JSONDecodeError, ValueError) as e:
+            last_err = e
+            print(f"[briefing] JSON 파싱 실패 (시도 {attempt+1}/2): {e}")
+            continue
+    if briefing is None:
+        raise ValueError(f"브리핑 JSON 파싱 실패 (2회 시도): {last_err}")
 
     # 소스 매핑
     for item in briefing.get('top3', []):
@@ -619,7 +646,7 @@ TOP 3 합쳐 800자, cross_insight 150자, contrarian 100자, quick_picks 150자
             print(f"  - {w}")
 
     # DB 저장
-    now = datetime.now().isoformat()
+    now = _now_kst().isoformat()
     try:
         with _get_db() as conn:
             for item in briefing.get('top3', []):
