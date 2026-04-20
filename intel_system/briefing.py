@@ -2,16 +2,24 @@
 모닝 브리핑 엔진
 - 5개 카테고리 뉴스 수집 -> 크로스 분석 -> 프리미엄 브리핑 생성
 """
-import json, re, sqlite3, requests, xml.etree.ElementTree as ET
+import json, re, sqlite3, requests, xml.etree.ElementTree as ET, os
 from datetime import datetime
 from urllib.parse import quote
 from config import CLAUDE_API_KEY
 
 DB = 'intel.db'
-# Claude Sonnet 4.6 pricing
-PRICE_INPUT  = 3.00 / 1_000_000   # $3.00 / 1M tokens
-PRICE_OUTPUT = 15.00 / 1_000_000  # $15.00 / 1M tokens
-MODEL = "claude-sonnet-4-6"
+# 환경변수로 모델 전환 가능 (기본 Haiku 4.5)
+MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-4-5-20251001')
+# 가격 (MODEL에 따라 자동 선택)
+if 'sonnet' in MODEL:
+    PRICE_INPUT  = 3.00 / 1_000_000
+    PRICE_OUTPUT = 15.00 / 1_000_000
+elif 'opus' in MODEL:
+    PRICE_INPUT  = 15.00 / 1_000_000
+    PRICE_OUTPUT = 75.00 / 1_000_000
+else:  # haiku
+    PRICE_INPUT  = 0.80 / 1_000_000
+    PRICE_OUTPUT = 4.00 / 1_000_000
 
 CAT_LABELS = {
     'economy':'글로벌 경제', 'geo':'지정학', 'tech':'기술혁신',
@@ -57,7 +65,13 @@ def _call_claude(prompt):
         "messages": [{"role": "user", "content": prompt}]
     }
     r = requests.post(url, json=body, headers=headers, timeout=90)
-    r.raise_for_status()
+    if r.status_code != 200:
+        # Claude API 실제 에러 메시지 포함
+        try:
+            err_detail = r.json()
+        except Exception:
+            err_detail = r.text[:500]
+        raise RuntimeError(f"Claude API {r.status_code}: {err_detail} (model={MODEL})")
     data = r.json()
     usage = data.get('usage', {})
     inp = usage.get('input_tokens', 0)
