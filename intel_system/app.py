@@ -393,6 +393,13 @@ def cron_daily_briefing():
                     VALUES(?,?,?,?)
                 ''', (b.get('date',''), b.get('headline',''), json.dumps(b, ensure_ascii=False), now))
 
+        # 캐시 재사용 시 날짜만 현재 KST로 갱신 (내용은 그대로)
+        if reused:
+            WEEKDAY_KR = ['월','화','수','목','금','토','일']
+            now_kst = _now()
+            b['date'] = now_kst.strftime('%Y-%m-%d')
+            b['weekday'] = WEEKDAY_KR[now_kst.weekday()]
+
         telegram_text = format_telegram(b)
 
         telegram_sent = False
