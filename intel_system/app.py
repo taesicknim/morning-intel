@@ -168,24 +168,32 @@ CAT_LABELS = {
     'society':'사회변화', 'invest':'투자기회'
 }
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/landing')
-def landing():
-    """랜딩 페이지 — 샘플 브리핑을 서버에서 직접 주입"""
+def _load_sample_json():
     import os
-    sample_json = '{}'
     try:
         sample_path = os.path.join(os.path.dirname(__file__), 'sample_briefing.json')
         if os.path.exists(sample_path):
             with open(sample_path, 'r', encoding='utf-8') as f:
                 d = json.load(f)
-                sample_json = d.get('payload', '{}')
+                return d.get('payload', '{}')
     except Exception:
         pass
-    return render_template('landing.html', sample_briefing_json=sample_json)
+    return '{}'
+
+@app.route('/')
+def index():
+    """메인 = 랜딩 페이지 (공유용)"""
+    return render_template('landing.html', sample_briefing_json=_load_sample_json())
+
+@app.route('/landing')
+def landing():
+    """호환성용 — 기존 /landing URL도 유지"""
+    return render_template('landing.html', sample_briefing_json=_load_sample_json())
+
+@app.route('/dashboard')
+def dashboard():
+    """관리자 대시보드"""
+    return render_template('index.html')
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
