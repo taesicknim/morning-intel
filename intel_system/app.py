@@ -300,6 +300,87 @@ def paste_analyze():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/cron/generate', methods=['GET', 'POST'])
+def cron_generate():
+    """브리핑 생성 전용 (6:45 AM 호출용). 100초 소요 예상.
+    cron-job.org는 30초 타임아웃되지만 Render는 백엔드에서 계속 처리.
+    Usage: /api/cron/generate?token=<CRON_SECRET>"""
+    token = request.args.get('token', '') or request.headers.get('X-Cron-Token', '')
+    if not CRON_SECRET or token != CRON_SECRET:
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        from briefing import generate_briefing
+
+        # 오늘 이미 생성된 게 있으면 스킵
+        today_kst = _now().strftime('%Y-%m-%d')
+        with get_db() as conn:
+            row = conn.execute('''
+                SELECT id FROM briefings WHERE date = ? ORDER BY created_at DESC LIMIT 1
+            ''', (today_kst,)).fetchone()
+            if row:
+                return jsonify({'ok': True, 'status': 'already_generated', 'briefing_id': row['id']})
+
+        b = generate_briefing()
+        now = _now().isoformat()
+        with get_db() as conn:
+            cur = conn.execute('''
+                INSERT INTO briefings(date, headline, payload, created_at)
+                VALUES(?,?,?,?)
+            ''', (b.get('date',''), b.get('headline',''), json.dumps(b, ensure_ascii=False), now))
+            bid = cur.lastrowid
+        return jsonify({'ok': True, 'status': 'generated', 'briefing_id': bid, 'headline': b.get('headline','')})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+@app.route('/api/cron/send', methods=['GET', 'POST'])
+def cron_send():
+    """오늘자 브리핑을 텔레그램 발송 (7:00 AM 호출용). 5초 이내 완료.
+    Usage: /api/cron/send?token=<CRON_SECRET>"""
+    token = request.args.get('token', '') or request.headers.get('X-Cron-Token', '')
+    if not CRON_SECRET or token != CRON_SECRET:
+        return jsonify({'error': 'unauthorized'}), 401
+
+    try:
+        from briefing import format_telegram
+        from telegram_bot import send_to_channel, TELEGRAM_TOKEN
+
+        # 오늘자 브리핑 조회
+        today_kst = _now().strftime('%Y-%m-%d')
+        with get_db() as conn:
+            row = conn.execute('''
+                SELECT id, payload FROM briefings WHERE date = ? ORDER BY created_at DESC LIMIT 1
+            ''', (today_kst,)).fetchone()
+
+        # 오늘자 없으면 최근 브리핑 사용하되 날짜는 오늘로 갱신
+        if not row:
+            with get_db() as conn:
+                row = conn.execute('''
+                    SELECT id, payload FROM briefings ORDER BY created_at DESC LIMIT 1
+                ''').fetchone()
+            if not row:
+                return jsonify({'error': 'no_briefing_available'}), 404
+
+        b = json.loads(row['payload'])
+
+        # 날짜 현재 KST로 갱신
+        WEEKDAY_KR = ['월','화','수','목','금','토','일']
+        now_kst = _now()
+        b['date'] = today_kst
+        b['weekday'] = WEEKDAY_KR[now_kst.weekday()]
+
+        text = format_telegram(b)
+        sent = False
+        if TELEGRAM_TOKEN:
+            result = send_to_channel(text)
+            sent = bool(result)
+
+        return jsonify({'ok': True, 'briefing_id': row['id'], 'telegram_sent': sent, 'headline': b.get('headline','')})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
 @app.route('/api/cron/health')
 def cron_health():
     """UptimeRobot / cron-job.org 헬스 체크용 (슬립 방지)"""
